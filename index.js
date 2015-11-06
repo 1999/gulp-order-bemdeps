@@ -239,14 +239,14 @@ function buildDependencyTree() {
             let promises = {};
 
             // first add basic deps for existing files
-            this[BEM_NAMING_KEY].forEach((filesList, stem) => {
+            for (let [stem, filesList] of this[BEM_NAMING_KEY]) {
                 let stemFile = {
                     file: null,
                     bemNaming: filesList[0].bemNaming
                 };
 
                 stems.set(stem, [stemFile]);
-            });
+            }
 
             for (let file of deps) {
                 let stem = getFileStem(file, '.deps.js');
@@ -267,11 +267,10 @@ function buildDependencyTree() {
                 stems.set(stem, stemFiles);
             }
 
-            stems.forEach((filesList, stem) => {
+            for (let [stem, filesList] of stems) {
                 let filesPromises = filesList.map(getDependencies);
-
                 promises[stem] = Promise.all(filesPromises).then(filterUnique);
-            });
+            }
 
             KinoPromise.all(promises).then(buildDepthGraph).then(resolve).catch(reject);
         });
