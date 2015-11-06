@@ -1,0 +1,35 @@
+{
+  "name": "gulp-order-bemdeps",
+  "version": "0.1.0",
+  "description": "Reorder a stream of files using deps.js files contents",
+  "bugs": {
+    "url": "https://github.com/1999/gulp-order-bemdeps/issues"
+  },
+  "maintainers": "Dmitry Sorin <dsorin@yandex-team.ru>",
+  "repositories": [
+    {
+      "type": "git",
+      "url": "git://github.com/1999/gulp-order-bemdeps.git"
+    }
+  ],
+  "main": "./index.js",
+  "dependencies": {
+    "glob": "5.0.15",
+    "gulp-concat": "2.6.0",
+    "gulp-util": "3.0.7",
+    "kinopromise": "0.2.1",
+    "parse-bem-identifier": "4.0.0",
+    "through2": "2.0.0"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=5.0"
+  },
+  "devDependencies": {
+    "jscs": "2.5.0",
+    "jshint": "2.8.0"
+  },
+  "scripts": {
+    "lint": "./node_modules/.bin/jshint -c .jshintrc index.js && ./node_modules/.bin/jscs -c .jscsrc index.js"
+  }
+}
