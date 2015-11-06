@@ -1,6 +1,6 @@
 {
   "name": "gulp-order-bemdeps",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reorder a stream of files using deps.js files contents",
   "bugs": {
     "url": "https://github.com/1999/gulp-order-bemdeps/issues"
@@ -23,13 +23,16 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=5.0"
+    "node": ">=4.0"
   },
   "devDependencies": {
+    "babel-cli": "6.1.2",
+    "babel-plugin-transform-es2015-spread": "6.0.14",
     "jscs": "2.5.0",
     "jshint": "2.8.0"
   },
   "scripts": {
-    "lint": "./node_modules/.bin/jshint -c .jshintrc index.js && ./node_modules/.bin/jscs -c .jscsrc index.js"
+    "lint": "./node_modules/.bin/jshint -c .jshintrc index.js && ./node_modules/.bin/jscs -c .jscsrc index.js",
+    "prepublish": "./node_modules/.bin/babel --plugins=babel-plugin-transform-es2015-spread index.js --out-file index.js"
   }
 }
