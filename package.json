@@ -18,7 +18,7 @@
     "deps.js",
     "gulpplugin"
   ],
-  "main": "./index.js",
+  "main": "./build.js",
   "dependencies": {
     "glob": "5.0.15",
     "gulp-concat": "2.6.0",
@@ -40,6 +40,6 @@
   },
   "scripts": {
     "lint": "./node_modules/.bin/jshint -c .jshintrc index.js && ./node_modules/.bin/jscs -c .jscsrc index.js",
-    "prepublish": "./node_modules/.bin/babel --plugins=babel-plugin-transform-es2015-spread,babel-plugin-transform-es2015-destructuring index.js --out-file index.js"
+    "prepublish": "./node_modules/.bin/babel --plugins=babel-plugin-transform-es2015-spread,babel-plugin-transform-es2015-destructuring index.js --out-file build.js"
   }
 }
