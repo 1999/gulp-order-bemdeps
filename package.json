@@ -1,6 +1,6 @@
 {
   "name": "gulp-order-bemdeps",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Reorder a stream of files using deps.js files contents",
   "bugs": {
     "url": "https://github.com/1999/gulp-order-bemdeps/issues"
