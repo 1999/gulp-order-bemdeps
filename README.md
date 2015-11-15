@@ -28,7 +28,9 @@ gulp.task('css', () => {
             'bower_components/bem-core/**/*.css',
             'app/ymodules/**/*.scss'
         ])
-        .pipe(bemDepsOrder('./'))
+        .pipe(bemDepsOrder(gulp.src([
+            'app/**/*deps.js'
+        ])))
         .pipe(concat("all.css"))
         .pipe(sass().on('error', sass.logError))
         .pipe(gulp.dest("./"));
@@ -36,4 +38,4 @@ gulp.task('css', () => {
 ```
 
 ## Options
-The only argument is base directory where deps.js files should be searched from.
+The only argument is stream of vinyl deps.js files. Use `gulp.src()` for this.
