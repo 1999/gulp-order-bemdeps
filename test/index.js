@@ -63,7 +63,29 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if no deps.js are supported but files need this', () => {
+        let stream = through2.obj();
+        let myBemDepsOrder = bemDepsOrder(stream);
 
+        // fill dependencies
+        fillDeps('deps-empty', stream);
+
+        // now pipe input files
+        fillInputFiles(['block1__elem', 'block1', 'block2'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            let blockIndex;
+            let blockElemIndex;
+
+            files.forEach((file, index) => {
+                if (file.stem === 'block1') {
+                    blockIndex = index;
+                } else if (file.stem === 'block1__elem') {
+                    blockElemIndex = index;
+                }
+            });
+
+            expect(blockIndex).to.be.below(blockElemIndex);
+        });
     });
 
     it('should reorder files in accordance to blocks dependencies', () => {
