@@ -20,10 +20,8 @@
   ],
   "main": "./build.js",
   "dependencies": {
-    "glob": "5.0.15",
     "gulp-concat": "2.6.0",
     "gulp-util": "3.0.7",
-    "kinopromise": "0.2.1",
     "parse-bem-identifier": "4.0.0",
     "through2": "2.0.0"
   },
@@ -34,12 +32,17 @@
   "devDependencies": {
     "babel-cli": "6.1.2",
     "babel-plugin-transform-es2015-destructuring": "6.0.18",
+    "babel-plugin-transform-es2015-parameters": "6.1.18",
     "babel-plugin-transform-es2015-spread": "6.0.14",
+    "chai": "3.4.1",
     "jscs": "2.5.0",
-    "jshint": "2.8.0"
+    "jshint": "2.8.0",
+    "mocha": "2.3.3",
+    "vinyl": "1.1.0"
   },
   "scripts": {
     "lint": "./node_modules/.bin/jshint -c .jshintrc index.js && ./node_modules/.bin/jscs -c .jscsrc index.js",
-    "prepublish": "./node_modules/.bin/babel --plugins=babel-plugin-transform-es2015-spread,babel-plugin-transform-es2015-destructuring index.js --out-file build.js"
+    "prepublish": "./node_modules/.bin/babel --plugins=babel-plugin-transform-es2015-spread,babel-plugin-transform-es2015-destructuring,babel-plugin-transform-es2015-parameters index.js --out-file build.js",
+    "test": "./node_modules/.bin/mocha -R spec --timeout 10000 --slow 5000 test/"
   }
 }
