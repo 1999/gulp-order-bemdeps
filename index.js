@@ -123,11 +123,11 @@ function flattenDepsJS(deps) {
  * Parse deps.js file contents into flat array of dependencies
  *
  * @param {String} contents
- * @return {Array}
+ * @return {Set}
  */
 function parseDependencies(contents) {
     let deps = vm.runInThisContext(contents);
-    return flattenDepsJS(deps).filter(Boolean);
+    return new Set(flattenDepsJS(deps).filter(Boolean));
 }
 
 /**
@@ -218,11 +218,12 @@ function addBasicDependencies(tree) {
  * @return {Number}
  */
 function calcRecursiveNodeWeight(tree, stem, weight, dependencyTree) {
-    if (!tree.has(stem)) {
-        throw new PluginError(PLUGIN_NAME, `Flat dependency tree doesn't have file stem: ${stem}`, {showStack: true});
-    }
-
     weight += 1;
+
+    // probably this file has already been exported
+    if (!tree.has(stem)) {
+        return weight;
+    }
 
     let dependencies = tree.get(stem);
     if (!dependencies.size) {

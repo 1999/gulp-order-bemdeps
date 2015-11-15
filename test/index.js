@@ -106,10 +106,36 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if distance to root is different', () => {
+        let stream = through2.obj();
+        let myBemDepsOrder = bemDepsOrder(stream);
 
+        // fill dependencies
+        fillDeps('deps-multiple', stream);
+
+        // now pipe input files
+        fillInputFiles(['block', 'mixins', 'variables'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(files[0].stem).to.equal('variables');
+            expect(files[1].stem).to.equal('mixins');
+            expect(files[2].stem).to.equal('block');
+        });
     });
 
     it('should reorder files even if its dependency block is not listed inside source files', () => {
+        let stream = through2.obj();
+        let myBemDepsOrder = bemDepsOrder(stream);
 
+        // fill dependencies
+        fillDeps('deps-hidden-dependency', stream);
+
+        // now pipe input files
+        fillInputFiles(['block__elem', 'variables', 'block'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(files[0].stem).to.equal('variables');
+            expect(files[1].stem).to.equal('block');
+            expect(files[2].stem).to.equal('block__elem');
+        });
     });
 });
