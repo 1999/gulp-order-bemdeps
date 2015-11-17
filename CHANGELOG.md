@@ -1,3 +1,9 @@
+## 0.3.0
+
+ * **new**: plugin emits error if smth bad happens (circular dependency, bad BEM naming etc)
+ * changes: get rid of vinyl devDependency
+ * fix: calculate tree nodes' weight using depth traversal, not width
+
 ## 0.2.0
 
  * **breaking change**: argument to plugin is now stream of vinyl files
