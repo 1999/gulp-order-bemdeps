@@ -21,8 +21,7 @@
     // Custom globals.
     "predef"        : [
         "exports",
-        "unescape",
-        "-console"
+        "unescape"
     ],
 
     // Development.

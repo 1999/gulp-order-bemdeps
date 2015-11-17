@@ -1,6 +1,5 @@
 'use strict';
 
-let path = require('path');
 let vm = require('vm');
 let gutil = require('gulp-util');
 let bemNamingParser = require('parse-bem-identifier');
@@ -9,6 +8,7 @@ let through2 = require('through2');
 let PluginError = gutil.PluginError;
 let collectStreamFiles = require('./lib/collect-stream-files');
 let bemNamingToClassname = require('./lib/bem-naming-to-classname');
+let getFileStem = require('./lib/get-file-stem');
 
 const PLUGIN_NAME = 'gulp-bem-css';
 const BEM_NAMING = Symbol('bem');
@@ -60,20 +60,6 @@ function getStreamAndPromiseForInputStream() {
         stream: stream,
         promise: promise
     };
-}
-
-/**
- * Get filename without description
- *
- * @param {String} filePath
- * @param {String} [ext]
- * @return {String}
- */
-function getFileStem(filePath, ext) {
-    filePath = path.resolve(filePath);
-    ext = ext || path.extname(filePath);
-
-    return path.basename(filePath, ext);
 }
 
 /**
@@ -204,6 +190,16 @@ function addRecursiveNodeDependencies(tree, bemNaming) {
 function addBasicDependencies(tree) {
     for (let [stem,] of tree) {
         let bemNaming = bemNamingParser(stem);
+
+        // validate bem naming
+        let isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
+            return bemNaming[key] === '';
+        });
+
+        if (isBadNaming) {
+            throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${stem}`, {showStack: true});
+        }
+
         addRecursiveNodeDependencies(tree, bemNaming);
     }
 }
@@ -236,10 +232,10 @@ function calcRecursiveNodeWeight(tree, stem, weight, dependencyTree) {
             throw new PluginError(PLUGIN_NAME, `Circular dependency detected: ${Array.from(dependencyTree)}`, {showStack: true});
         }
 
-        dependencyTree = new Set(dependencyTree);
-        dependencyTree.add(dependency);
+        let nodeDependencyTree = new Set(dependencyTree);
+        nodeDependencyTree.add(dependency);
 
-        let dependencyDistanceWeight = calcRecursiveNodeWeight(tree, dependency, weight, dependencyTree);
+        let dependencyDistanceWeight = calcRecursiveNodeWeight(tree, dependency, weight, nodeDependencyTree, stem);
         weights.push(dependencyDistanceWeight);
     }
 
@@ -286,6 +282,8 @@ function calcTreeNodesWeight(tree) {
  * @return {Stream}
  */
 function gulpBemCSS(deps) {
+    let streamCtx;
+
     let {
         stream: output,
         promise: inputPromise
@@ -296,9 +294,11 @@ function gulpBemCSS(deps) {
     Promise.all([
         collectStreamFiles(deps).then(combineDeps),
         inputPromise
-    ]).then(([tree, input]) => {
+    ]).then(([tree, {files, ctx, closeStreamCallback}]) => {
+        streamCtx = ctx;
+
         // filter block files with no dependencies (2nd microtask)
-        let files = input.files.filter(file => {
+        files = files.filter(file => {
             let fileStem = getFileStem(file.path);
             let bemNaming = bemNamingParser(fileStem);
 
@@ -313,7 +313,7 @@ function gulpBemCSS(deps) {
 
             let isBlock = isBlockBemNaming(bemNaming);
             if (isBlock && !tree.has(bemNaming.block)) {
-                input.ctx.push(file);
+                ctx.push(file);
                 return false;
             }
 
@@ -340,13 +340,16 @@ function gulpBemCSS(deps) {
         });
 
         for (let file of files) {
-            input.ctx.push(file);
+            ctx.push(file);
         }
 
         // close stream
-        input.closeStreamCallback();
+        closeStreamCallback();
     }).catch(err => {
-        throw new PluginError(PLUGIN_NAME, `Plugin procesing error: ${err.message}`, {showStack: true});
+        console.error(gutil.colors.red(err.message));
+        console.error(err.toString());
+
+        streamCtx.emit('error', err);
     });
 
     return output;

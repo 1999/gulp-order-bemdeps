@@ -1,12 +1,14 @@
 'use strict';
 
 let path = require('path');
+let gutil = require('gulp-util');
 let through2 = require('through2');
-let File = require('vinyl');
+let File = gutil.File;
 
 let bemDepsOrder = require('../build');
 let expect = require('chai').expect;
 let collectStreamFiles = require('../lib/collect-stream-files');
+let getFileStem = require('../lib/get-file-stem');
 
 function fillDeps(filename, stream) {
     let files = require(`./${filename}`);
@@ -56,9 +58,9 @@ describe('gulp-order-bemdeps', () => {
             expect(files).to.have.length(3);
 
             // files order should be the same
-            expect(files[0].stem).to.equal('block1');
-            expect(files[1].stem).to.equal('block2');
-            expect(files[2].stem).to.equal('block3');
+            expect(getFileStem(files[0].path)).to.equal('block1');
+            expect(getFileStem(files[1].path)).to.equal('block2');
+            expect(getFileStem(files[2].path)).to.equal('block3');
         });
     });
 
@@ -77,9 +79,11 @@ describe('gulp-order-bemdeps', () => {
             let blockElemIndex;
 
             files.forEach((file, index) => {
-                if (file.stem === 'block1') {
+                let stem = getFileStem(file.path);
+
+                if (stem === 'block1') {
                     blockIndex = index;
-                } else if (file.stem === 'block1__elem') {
+                } else if (stem === 'block1__elem') {
                     blockElemIndex = index;
                 }
             });
@@ -99,9 +103,9 @@ describe('gulp-order-bemdeps', () => {
         fillInputFiles(['mixins', 'block', 'variables'], myBemDepsOrder);
 
         return collectStreamFiles(myBemDepsOrder).then(files => {
-            expect(files[0].stem).to.equal('variables');
-            expect(files[1].stem).to.equal('mixins');
-            expect(files[2].stem).to.equal('block');
+            expect(getFileStem(files[0].path)).to.equal('variables');
+            expect(getFileStem(files[1].path)).to.equal('mixins');
+            expect(getFileStem(files[2].path)).to.equal('block');
         });
     });
 
@@ -116,9 +120,9 @@ describe('gulp-order-bemdeps', () => {
         fillInputFiles(['block', 'mixins', 'variables'], myBemDepsOrder);
 
         return collectStreamFiles(myBemDepsOrder).then(files => {
-            expect(files[0].stem).to.equal('variables');
-            expect(files[1].stem).to.equal('mixins');
-            expect(files[2].stem).to.equal('block');
+            expect(getFileStem(files[0].path)).to.equal('variables');
+            expect(getFileStem(files[1].path)).to.equal('mixins');
+            expect(getFileStem(files[2].path)).to.equal('block');
         });
     });
 
@@ -133,9 +137,52 @@ describe('gulp-order-bemdeps', () => {
         fillInputFiles(['block__elem', 'variables', 'block'], myBemDepsOrder);
 
         return collectStreamFiles(myBemDepsOrder).then(files => {
-            expect(files[0].stem).to.equal('variables');
-            expect(files[1].stem).to.equal('block');
-            expect(files[2].stem).to.equal('block__elem');
+            expect(getFileStem(files[0].path)).to.equal('variables');
+            expect(getFileStem(files[1].path)).to.equal('block');
+            expect(getFileStem(files[2].path)).to.equal('block__elem');
+        });
+    });
+
+    it('should stop piping data and show stack if bem naming is invalid', () => {
+        let stream = through2.obj();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-invalid-bem-naming', stream);
+
+        // now pipe input files
+        fillInputFiles(['sample-block'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).catch(err => {
+            expect(err.message).to.be.equal('Invalid bem naming used: invalid-block____foo');
+        });
+    });
+
+    it('should calculate tree nodes weight using depth traversal, not width', () => {
+        let stream = through2.obj();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-multiple-copy-set', stream);
+
+        // now pipe input files
+        fillInputFiles(['admin-post', 'variables', 'mixins', 'button', 'i-bem__dom'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder);
+    });
+
+    it('should show error if circular dependency is detected', () => {
+        let stream = through2.obj();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-circular', stream);
+
+        // now pipe input files
+        fillInputFiles(['some-block'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).catch(err => {
+            expect(err.message).to.match(new RegExp('^Circular dependency detected'));
         });
     });
 });

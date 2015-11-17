@@ -37,8 +37,7 @@
     "chai": "3.4.1",
     "jscs": "2.5.0",
     "jshint": "2.8.0",
-    "mocha": "2.3.3",
-    "vinyl": "1.1.0"
+    "mocha": "2.3.3"
   },
   "scripts": {
     "lint": "./node_modules/.bin/jshint -c .jshintrc index.js && ./node_modules/.bin/jscs -c .jscsrc index.js",
