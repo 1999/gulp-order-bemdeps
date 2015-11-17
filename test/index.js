@@ -2,7 +2,6 @@
 
 let path = require('path');
 let gutil = require('gulp-util');
-let through2 = require('through2');
 let File = gutil.File;
 
 let bemDepsOrder = require('../build');
@@ -40,7 +39,7 @@ function fillInputFiles(files, stream) {
 
 describe('gulp-order-bemdeps', () => {
     it('should not change order of files if no deps.js exist', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -65,7 +64,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if no deps.js are supported but files need this', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -93,7 +92,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files in accordance to blocks dependencies', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -110,7 +109,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if distance to root is different', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -127,7 +126,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if its dependency block is not listed inside source files', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -144,7 +143,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should stop piping data and show stack if bem naming is invalid', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -159,7 +158,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should calculate tree nodes weight using depth traversal, not width', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -172,7 +171,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should show error if circular dependency is detected', () => {
-        let stream = through2.obj();
+        let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
