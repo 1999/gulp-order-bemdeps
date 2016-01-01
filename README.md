@@ -6,6 +6,8 @@
 
 Gulp plugin which reorders a stream of files using deps.js files contents. If you're not familiar with what BEM is or what deps.js files are used for, [this link](https://en.bem.info/technology/deps/about/#depsjs-syntax) is for you.
 
+Post on Medium.com: https://medium.com/@1999/bem-more-than-methodology-less-than-technology-4b66c42da6ef
+
 # Install
 
 ```
