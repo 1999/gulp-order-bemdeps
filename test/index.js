@@ -184,4 +184,39 @@ describe('gulp-order-bemdeps', () => {
             expect(err.message).to.match(new RegExp('^Circular dependency detected'));
         });
     });
+
+    it('should reorder files if deps.js files contain mods object', () => {
+        let stream = gutil.noop();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-mods', stream);
+
+        // now pipe input files
+        fillInputFiles(['film-header', 'argument_type_movie', 'film-header__argument'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(getFileStem(files[0].path)).to.equal('argument_type_movie');
+            expect(getFileStem(files[1].path)).to.equal('film-header');
+            expect(getFileStem(files[2].path)).to.equal('film-header__argument');
+        });
+    });
+
+    it('should reorder files if deps.js files contain elems array', () => {
+        let stream = gutil.noop();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-elems', stream);
+
+        // now pipe input files
+        fillInputFiles(['film-header', 'argument', 'argument__series', 'film-header__argument'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(getFileStem(files[0].path)).to.equal('argument');
+            expect(getFileStem(files[1].path)).to.equal('argument__series');
+            expect(getFileStem(files[2].path)).to.equal('film-header');
+            expect(getFileStem(files[3].path)).to.equal('film-header__argument');
+        });
+    });
 });
