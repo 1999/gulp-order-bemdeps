@@ -10,7 +10,7 @@ let collectStreamFiles = require('../lib/collect-stream-files');
 let getFileStem = require('../lib/get-file-stem');
 
 function fillDeps(filename, stream) {
-    let files = require(`./${filename}`);
+    let files = require(`./deps/${filename}`);
 
     Object.keys(files).forEach(file => {
         let vinylFile = new File({
