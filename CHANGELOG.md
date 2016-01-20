@@ -1,3 +1,7 @@
+## 0.3.1
+
+ * support `mods` and `elems` keys in deps.js files
+
 ## 0.3.0
 
  * **new**: plugin emits error if smth bad happens (circular dependency, bad BEM naming etc)
