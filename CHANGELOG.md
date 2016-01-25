@@ -1,3 +1,8 @@
+## 0.4.0
+
+ * **new**: support mods flat arrays (check this test for more info: 2c751031c7ec36b01a94f79020c8157de634b3d6)
+ * **new**: support mods value arrays (check this test for more info: 15fa6d2fe2e025d478a2b38b3ae76b9c67dd2f20)
+
 ## 0.3.1
 
  * support `mods` and `elems` keys in deps.js files
