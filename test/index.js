@@ -202,6 +202,23 @@ describe('gulp-order-bemdeps', () => {
         });
     });
 
+    it('should reorder files if deps.js files contain mods object with flat array', () => {
+        let stream = gutil.noop();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-mods-array', stream);
+
+        // now pipe input files
+        fillInputFiles(['film-header', 'argument_type_movie', 'film-header__argument'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(getFileStem(files[0].path)).to.equal('argument_type_movie');
+            expect(getFileStem(files[1].path)).to.equal('film-header');
+            expect(getFileStem(files[2].path)).to.equal('film-header__argument');
+        });
+    });
+
     it('should reorder files if deps.js files contain elems array', () => {
         let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
