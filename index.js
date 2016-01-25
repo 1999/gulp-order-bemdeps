@@ -88,15 +88,25 @@ function flattenDepsJS(deps) {
         let dependencyStem = dependency.block;
 
         if (typeof dependency.mods === 'object') {
-            Object.keys(dependency.mods).forEach(modName => {
-                const modVal = dependency.mods[modName];
-
-                if (typeof modVal === 'boolean') {
+            if (Array.isArray(dependency.mods)) {
+                for (let modName of dependency.mods) {
                     output.push(`${dependencyStem}_${modName}`);
-                } else {
-                    output.push(`${dependencyStem}_${modName}_${modVal}`);
                 }
-            });
+            } else {
+                Object.keys(dependency.mods).forEach(modName => {
+                    const modVal = dependency.mods[modName];
+
+                    if (Array.isArray(modVal)) {
+                        for (let modFinalVal of modVal) {
+                            output.push(`${dependencyStem}_${modName}_${modFinalVal}`);
+                        }
+                    } else if (typeof modVal === 'boolean') {
+                        output.push(`${dependencyStem}_${modName}`);
+                    } else {
+                        output.push(`${dependencyStem}_${modName}_${modVal}`);
+                    }
+                });
+            }
         } else if (Array.isArray(dependency.elems)) {
             for (let elem of dependency.elems) {
                 output.push(`${dependencyStem}__${elem}`);
