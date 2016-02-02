@@ -104,6 +104,7 @@ function flattenDepsJS(deps) {
                         output.push(`${dependencyStem}_${modName}`);
                     } else {
                         output.push(`${dependencyStem}_${modName}_${modVal}`);
+                        output.push(`${dependencyStem}_${modName}`);
                     }
                 });
             }
