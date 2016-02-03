@@ -142,23 +142,6 @@ describe('gulp-order-bemdeps', () => {
         });
     });
 
-    it('should reorder default modifier and same but boolean modifier', () => {
-        let stream = gutil.noop();
-        let myBemDepsOrder = bemDepsOrder(stream);
-
-        // fill dependencies
-        fillDeps('deps-hidden-dependency', stream);
-
-        // now pipe input files
-        fillInputFiles(['block_modname_modval', 'block_modname', 'variables'], myBemDepsOrder);
-
-        return collectStreamFiles(myBemDepsOrder).then(files => {
-            expect(getFileStem(files[0].path)).to.equal('variables');
-            expect(getFileStem(files[1].path)).to.equal('block_modname');
-            expect(getFileStem(files[2].path)).to.equal('block_modname_modval');
-        });
-    });
-
     it('should reorder a dependent block with boolean mod', () => {
         let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
