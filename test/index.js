@@ -142,6 +142,23 @@ describe('gulp-order-bemdeps', () => {
         });
     });
 
+    it('should reorder a dependent block with boolean mod', () => {
+        let stream = gutil.noop();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-block-with-modifier', stream);
+
+        // now pipe input files
+        fillInputFiles(['button', 'input', 'input_size'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(getFileStem(files[0].path)).to.equal('input');
+            expect(getFileStem(files[1].path)).to.equal('input_size');
+            expect(getFileStem(files[2].path)).to.equal('button');
+        });
+    });
+
     it('should stop piping data and show stack if bem naming is invalid', () => {
         let stream = gutil.noop();
         let myBemDepsOrder = bemDepsOrder(stream);
