@@ -13,7 +13,7 @@ let getFileStem = require('./lib/get-file-stem');
 const PLUGIN_NAME = 'gulp-bem-css';
 const BEM_NAMING = Symbol('bem');
 const STEM = Symbol('stem');
-const BEM_NAMING_PARSED_KEYS = ['block', 'mod', 'modVal', 'elem', 'elemMod', 'elemVal', 'elemMods'];
+const BEM_NAMING_PARSED_KEYS = ['block', 'mod', 'modVal', 'elem', 'elemMod', 'elemVal'];
 
 /**
  * Helper function
@@ -130,15 +130,15 @@ function flattenDepsJS(deps) {
                     Object.keys(elemMods).forEach(modName => {
                         let modVal = elemMods[modName];
 
-                        if (modVal === true) {
-                            dependencyStem += `_${modName}_${modVal}`;
-                        } else {
-                            dependencyStem += `_${modName}_${modVal}`;
+                        dependencyStem += `_${modName}`;
+                        output.push(dependencyStem);
+
+                        if (typeof modVal !== 'boolean') {
+                            dependencyStem += `_${modVal}`;
                         }
                     });
                 }
             }
-
 
             output.push(dependencyStem);
         }
