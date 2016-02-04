@@ -1,3 +1,7 @@
+## 0.5.0
+
+ * **new**: `block_mod_val.tech` now depends on `block_mod.tech` and then on `block.tech` files
+
 ## 0.4.0
 
  * **new**: support mods flat arrays (check this test for more info: 2c751031c7ec36b01a94f79020c8157de634b3d6)
