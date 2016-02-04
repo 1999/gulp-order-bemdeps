@@ -270,4 +270,22 @@ describe('gulp-order-bemdeps', () => {
             expect(getFileStem(files[3].path)).to.equal('film-header__argument');
         });
     });
+
+    it('should reorder files if deps.js filles contain elemMods', () => {
+        let stream = gutil.noop();
+        let myBemDepsOrder = bemDepsOrder(stream);
+
+        // fill dependencies
+        fillDeps('deps-elemMods', stream);
+
+        // now pipe input files
+        fillInputFiles(['film-header__argument', 'film-header', 'button__elem_size_s', 'input__elem_size'], myBemDepsOrder);
+
+        return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(getFileStem(files[0].path)).to.equal('input__elem_size');
+            expect(getFileStem(files[1].path)).to.equal('button__elem_size_s');
+            expect(getFileStem(files[2].path)).to.equal('film-header');
+            expect(getFileStem(files[3].path)).to.equal('film-header__argument');
+        });
+    });
 });

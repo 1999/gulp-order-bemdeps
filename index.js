@@ -123,6 +123,21 @@ function flattenDepsJS(deps) {
 
             if (dependency.elem) {
                 dependencyStem += `__${dependency.elem}`;
+
+                let {elemMods} = dependency;
+
+                if (elemMods) {
+                    Object.keys(elemMods).forEach(modName => {
+                        let modVal = elemMods[modName];
+
+                        dependencyStem += `_${modName}`;
+                        output.push(dependencyStem);
+
+                        if (typeof modVal !== 'boolean') {
+                            dependencyStem += `_${modVal}`;
+                        }
+                    });
+                }
             }
 
             output.push(dependencyStem);
