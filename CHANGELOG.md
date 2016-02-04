@@ -1,3 +1,7 @@
+## 0.6.0
+
+ * **new**: elemMods support
+
 ## 0.5.0
 
  * **new**: `block_mod_val.tech` now depends on `block_mod.tech` and then on `block.tech` files
