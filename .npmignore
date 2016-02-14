@@ -1,4 +1,5 @@
 test/
+.babelrc
 .editorconfig
 .jscsrc
 .jshintrc
