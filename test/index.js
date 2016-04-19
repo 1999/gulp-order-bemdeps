@@ -1,13 +1,12 @@
 'use strict';
 
-let path = require('path');
-let gutil = require('gulp-util');
-let File = gutil.File;
+import path from 'path';
+import {noop, File} from 'gulp-util';
+import {expect} from 'chai';
 
-let bemDepsOrder = require('../build');
-let expect = require('chai').expect;
-let collectStreamFiles = require('../lib/collect-stream-files');
-let getFileStem = require('../lib/get-file-stem');
+import bemDepsOrder from '../index.js';
+import collectStreamFiles from '../lib/collect-stream-files';
+import getFileStem from '../lib/get-file-stem';
 
 function fillDeps(filename, stream) {
     let files = require(`./deps/${filename}`);
@@ -39,7 +38,7 @@ function fillInputFiles(files, stream) {
 
 describe('gulp-order-bemdeps', () => {
     it('should not change order of files if no deps.js exist', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -64,7 +63,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if no deps.js are supported but files need this', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -92,7 +91,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files in accordance to blocks dependencies', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -109,7 +108,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if distance to root is different', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -126,7 +125,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files even if its dependency block is not listed inside source files', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -143,7 +142,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder a dependent block with boolean mod', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -160,7 +159,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should stop piping data and show stack if bem naming is invalid', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -175,7 +174,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should calculate tree nodes weight using depth traversal, not width', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -188,7 +187,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should show error if circular dependency is detected', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -203,7 +202,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files if deps.js files contain mods object', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -220,7 +219,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files if deps.js files contain mods flat array', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -237,7 +236,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files if deps.js files contain mods object with value array', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -254,7 +253,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files if deps.js files contain elems array', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies
@@ -272,7 +271,7 @@ describe('gulp-order-bemdeps', () => {
     });
 
     it('should reorder files if deps.js filles contain elemMods', () => {
-        let stream = gutil.noop();
+        let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
 
         // fill dependencies

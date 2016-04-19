@@ -10,7 +10,7 @@ let collectStreamFiles = require('./lib/collect-stream-files');
 let bemNamingToClassname = require('./lib/bem-naming-to-classname');
 let getFileStem = require('./lib/get-file-stem');
 
-const PLUGIN_NAME = 'gulp-bem-css';
+const PLUGIN_NAME = 'gulp-order-bemdeps';
 const BEM_NAMING = Symbol('bem');
 const STEM = Symbol('stem');
 const BEM_NAMING_PARSED_KEYS = ['block', 'mod', 'modVal', 'elem', 'elemMod', 'elemVal'];
@@ -295,10 +295,10 @@ function calcRecursiveNodeWeight(tree, stem, weight, dependencyTree) {
  * @return {Map}
  */
 function calcTreeNodesWeight(tree) {
-    let output = new Map();
+    const output = new Map();
 
     for (let [stem,] of tree) {
-        let weight = calcRecursiveNodeWeight(tree, stem, 0, new Set());
+        const weight = calcRecursiveNodeWeight(tree, stem, 0, new Set());
         output.set(stem, weight);
     }
 
@@ -323,7 +323,7 @@ function calcTreeNodesWeight(tree) {
  * @param {Stream} deps - stream of vinyl deps files (use gulp.src() for this)
  * @return {Stream}
  */
-function gulpBemCSS(deps) {
+function gulpOrderBemDeps(deps) {
     let streamCtx;
 
     let {
@@ -397,4 +397,4 @@ function gulpBemCSS(deps) {
     return output;
 }
 
-module.exports = gulpBemCSS;
+module.exports = gulpOrderBemDeps;
