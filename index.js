@@ -247,62 +247,83 @@ function addBasicDependencies(tree) {
 }
 
 /**
- * Recursively calculate distance from node to the root element
+ * Output tree with BFS
  *
- * @param {Map} tree - flat tree of all stems
- * @param {String} stem - stem to search for
- * @param {Number} weight - current weight
- * @param {Set} dependencyTree - set of dependencies in case of circular dependency
- * @return {Number}
+ * @param {Array<VinylFile>} files
+ * @param {Map<String:Set>} tree
+ * @param {Stream} ctx
  */
-function calcRecursiveNodeWeight(tree, stem, weight, dependencyTree) {
-    weight += 1;
-
-    // probably this file has already been exported
-    if (!tree.has(stem)) {
-        return weight;
+function bfsOutputTree(files, tree, ctx) {
+    // convert files into hash table so we could find faster
+    const filesHash = new Map();
+    for (let file of files) {
+        filesHash.set(file[STEM], file);
     }
 
-    let dependencies = tree.get(stem);
-    if (!dependencies.size) {
-        return weight;
-    }
-
-    let weights = [];
-    for (let dependency of dependencies) {
-        if (dependencyTree.has(dependency)) {
-            throw new PluginError(PLUGIN_NAME, `Circular dependency detected: ${Array.from(dependencyTree)}`, {showStack: true});
+    // convert dependency tree to the opposite side:
+    // right now tree node value is its dependencies i.e. stems is depends on
+    // new tree node value is its dependent i.e. stems which depend on current node
+    const treeDependents = new Map();
+    for (let [stem, dependencies] of tree) {
+        if (!treeDependents.has(stem)) {
+            treeDependents.set(stem, new Set())
         }
 
-        let nodeDependencyTree = new Set(dependencyTree);
-        nodeDependencyTree.add(dependency);
+        for (let dependencyStem of dependencies) {
+            if (!treeDependents.has(dependencyStem)) {
+                treeDependents.set(dependencyStem, new Set());
+            }
 
-        let dependencyDistanceWeight = calcRecursiveNodeWeight(tree, dependency, weight, nodeDependencyTree, stem);
-        weights.push(dependencyDistanceWeight);
+            treeDependents.get(dependencyStem).add(stem);
+        }
     }
 
-    return Math.max(...weights);
-}
+    // first find all tree nodes which have no dependencies: these are root node children
+    // then add fake root node with these nodes to start BFS
+    const rootNodeStem = Symbol('root');
+    const rootNodeChildren = new Set();
 
-/**
- * Calculation of tree nodes' weights which is the most important part of the plugin
- * By this time tree consists of all existing deps and input files with their existing dependencies
- * Each tree key is a string file stem (for example `award_important`) and value is a set of dependencies
- * Task is to calculate the longest distance to the root block out of all stem's dependencies
- * If set of stem's dependencies is empty node weight equals 1 (its parent is invisible root node)
- *
- * @param {Map} tree
- * @return {Map}
- */
-function calcTreeNodesWeight(tree) {
-    const output = new Map();
-
-    for (let [stem,] of tree) {
-        const weight = calcRecursiveNodeWeight(tree, stem, 0, new Set());
-        output.set(stem, weight);
+    for (let [stem, dependencies] of treeDependents) {
+        if (!dependencies.size) {
+            rootNodeChildren.add(stem);
+        }
     }
 
-    return output;
+    // first add root node into processing queue
+    const processingQueue = [{
+        dependencies: rootNodeChildren,
+        stem: rootNodeStem
+    }];
+
+    while (processingQueue.length) {
+        const treeNode = processingQueue.shift();
+
+        // output file corresponding to node if it's not root node
+        if (treeNode.stem !== rootNodeStem && filesHash.has(treeNode.stem)) {
+            const file = filesHash.get(treeNode.stem);
+
+            ctx.push(file);
+            filesHash.delete(treeNode.stem);
+        }
+
+        for (let stem of treeNode.dependencies) {
+            // this node has probably been processed already
+            if (!tree.has(stem)) {
+                continue;
+            }
+
+            const childNodeDependencies = tree.get(stem);
+
+            // add node to processing queue
+            processingQueue.push({
+                stem,
+                dependencies: childNodeDependencies
+            });
+
+            // delete it from tree so it won't be processed twice
+            tree.delete(stem);
+        }
+    }
 }
 
 /**
@@ -341,11 +362,11 @@ function gulpOrderBemDeps(deps) {
 
         // filter block files with no dependencies (2nd microtask)
         files = files.filter(file => {
-            let fileStem = getFileStem(file.path);
-            let bemNaming = bemNamingParser(fileStem);
+            const fileStem = getFileStem(file.path);
+            const bemNaming = bemNamingParser(fileStem);
 
             // validate bem naming
-            let isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
+            const isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
                 return bemNaming[key] === '';
             });
 
@@ -353,7 +374,9 @@ function gulpOrderBemDeps(deps) {
                 throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${fileStem}`, {showStack: true});
             }
 
-            let isBlock = isBlockBemNaming(bemNaming);
+            // if file stem is not listed in dependencies tree it's independent
+            // so it's safe to output it right now
+            const isBlock = isBlockBemNaming(bemNaming);
             if (isBlock && !tree.has(bemNaming.block)) {
                 ctx.push(file);
                 return false;
@@ -373,17 +396,8 @@ function gulpOrderBemDeps(deps) {
         // add missing basic dependencies
         addBasicDependencies(tree);
 
-        // calculate tree nodes' weights
-        let treeNodesWeights = calcTreeNodesWeight(tree);
-
-        // 3rd microtask: reorder
-        files.sort((a, b) => {
-            return (treeNodesWeights.get(a[STEM]) || 0) - (treeNodesWeights.get(b[STEM]) || 0);
-        });
-
-        for (let file of files) {
-            ctx.push(file);
-        }
+        // 3rd microtask: reorder and output
+        bfsOutputTree(files, tree, ctx);
 
         // close stream
         closeStreamCallback();
