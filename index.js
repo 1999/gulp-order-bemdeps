@@ -166,14 +166,14 @@ function parseDependencies(contents) {
  * @return {Map} where keys are {String} stems and values are {Set} with dependencies of this stem
  */
 function combineDeps(deps) {
-    let output = new Map();
+    const output = new Map();
 
     for (let file of deps) {
-        let stem = getFileStem(file.path, '.deps.js');
-        let stemDependencies = parseDependencies(file.contents.toString('utf8'));
+        const stem = getFileStem(file.path, '.deps.js');
+        const stemDependencies = parseDependencies(file.contents.toString('utf8'));
 
         if (output.has(stem)) {
-            let existingDependencies = output.get(stem);
+            const existingDependencies = output.get(stem);
 
             for (let dependency of stemDependencies) {
                 existingDependencies.add(dependency);
@@ -225,7 +225,7 @@ function addRecursiveNodeDependencies(tree, bemNaming) {
 /**
  * Add block/element basic dependencies to flat tree. What is basic dependency?
  * If file stem is `block__elem` then it is Set(`block`)
- * If file stem is `block_mod_val__elem` then it is Set(`block`)
+ * If file stem is `block_mod_val__elem` then it is Set(`block`, `block_mod_val`)
  *
  * @param {Map} tree
  */
@@ -243,6 +243,23 @@ function addBasicDependencies(tree) {
         }
 
         addRecursiveNodeDependencies(tree, bemNaming);
+    }
+}
+
+/**
+ * Add essential dependencies to tree. What is essential dependency?
+ * If file stem is `mixins` and it depends on `variables` and there's no `variables` in tree
+ * then it's `variables`
+ *
+ * @param {Map} tree
+ */
+function addRootDependencies(tree) {
+    for (let [stem, dependencies] of tree) {
+        for (let dependencyStem of dependencies) {
+            if (!tree.has(dependencyStem)) {
+                tree.set(dependencyStem, new Set());
+            }
+        }
     }
 }
 
@@ -278,12 +295,12 @@ function bfsOutputTree(files, tree, ctx) {
         }
     }
 
-    // first find all tree nodes which have no dependencies: these are root node children
+    // find all tree nodes which have no dependencies: these are root node children
     // then add fake root node with these nodes to start BFS
     const rootNodeStem = Symbol('root');
     const rootNodeChildren = new Set();
 
-    for (let [stem, dependencies] of treeDependents) {
+    for (let [stem, dependencies] of tree) {
         if (!dependencies.size) {
             rootNodeChildren.add(stem);
         }
@@ -291,7 +308,7 @@ function bfsOutputTree(files, tree, ctx) {
 
     // first add root node into processing queue
     const processingQueue = [{
-        dependencies: rootNodeChildren,
+        dependents: rootNodeChildren,
         stem: rootNodeStem
     }];
 
@@ -306,22 +323,22 @@ function bfsOutputTree(files, tree, ctx) {
             filesHash.delete(treeNode.stem);
         }
 
-        for (let stem of treeNode.dependencies) {
+        for (let stem of treeNode.dependents) {
             // this node has probably been processed already
-            if (!tree.has(stem)) {
+            if (!treeDependents.has(stem)) {
                 continue;
             }
 
-            const childNodeDependencies = tree.get(stem);
+            const childNodeDependents = treeDependents.get(stem);
 
             // add node to processing queue
             processingQueue.push({
                 stem,
-                dependencies: childNodeDependencies
+                dependents: childNodeDependents
             });
 
             // delete it from tree so it won't be processed twice
-            tree.delete(stem);
+            treeDependents.delete(stem);
         }
     }
 }
@@ -395,6 +412,9 @@ function gulpOrderBemDeps(deps) {
 
         // add missing basic dependencies
         addBasicDependencies(tree);
+
+        // add essential dependencies (block->mixins->variables: add variables)
+        addRootDependencies(tree);
 
         // 3rd microtask: reorder and output
         bfsOutputTree(files, tree, ctx);
