@@ -1,3 +1,7 @@
+## 0.7.0
+
+ * **new**: BFS approach to output sorted files. It can be significantly faster on some configurations.
+
 ## 0.6.0
 
  * **new**: elemMods support
