@@ -18,7 +18,7 @@
     "deps.js",
     "gulpplugin"
   ],
-  "main": "./build.js",
+  "main": "./dist/build.js",
   "dependencies": {
     "gulp-util": "3.0.7",
     "parse-bem-identifier": "4.0.0",
@@ -42,7 +42,10 @@
   },
   "scripts": {
     "lint": "./node_modules/.bin/jshint -c .jshintrc index.js && ./node_modules/.bin/jscs -c .jscsrc index.js",
-    "prepublish": "./node_modules/.bin/babel index.js --out-file build.js",
+    "prepublish": "npm run prepublish:entrypoint && npm run prepublish:libs:clean && npm run prepublish:libs:build",
+    "prepublish:entrypoint": "./node_modules/.bin/babel index.js --out-file dist/build.js",
+    "prepublish:libs:clean": "rm -fr ./dist/lib",
+    "prepublish:libs:build": "./node_modules/.bin/babel lib/ --out-dir ./dist/lib",
     "test": "./node_modules/.bin/mocha --compilers js:babel-register -R spec --timeout 10000 --slow 5000 test/"
   }
 }

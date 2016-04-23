@@ -1,18 +1,19 @@
 'use strict';
 
-let vm = require('vm');
-let gutil = require('gulp-util');
-let bemNamingParser = require('parse-bem-identifier');
-let through2 = require('through2');
+import vm from 'vm';
+import bemNamingParser from 'parse-bem-identifier';
+import through2 from 'through2';
+import {colors, PluginError} from 'gulp-util';
 
-let PluginError = gutil.PluginError;
-let collectStreamFiles = require('./lib/collect-stream-files');
-let bemNamingToClassname = require('./lib/bem-naming-to-classname');
-let getFileStem = require('./lib/get-file-stem');
+import collectStreamFiles from './lib/collect-stream-files';
+import bemNamingToClassname from './lib/bem-naming-to-classname';
+import getFileStem from './lib/get-file-stem';
+import TreeNode, {ensureExists} from './lib/tree-node';
+import bfsOutputTree from './lib/bfs-output-tree';
 
 const PLUGIN_NAME = 'gulp-order-bemdeps';
 const BEM_NAMING = Symbol('bem');
-const STEM = Symbol('stem');
+const STEM = Symbol.for('stem');
 const BEM_NAMING_PARSED_KEYS = ['block', 'mod', 'modVal', 'elem', 'elemMod', 'elemVal'];
 
 /**
@@ -159,50 +160,68 @@ function parseDependencies(contents) {
 }
 
 /**
- * Combine all deps.js files into one map
- * This is useful because there can be multiple files with one stem (they are resolved with `levels` in ENB/BEM)
+ * Build tree from all deps.js files
+ * Also build hash table with all tree nodes for fast insert op
  *
- * @param {Array} deps
- * @return {Map} where keys are {String} stems and values are {Set} with dependencies of this stem
+ * @param {Array<VinylFile>} deps
+ * @return {Array<TreeNode, Map>} 2-elements array: [rootNode, hash]
  */
 function combineDeps(deps) {
-    let output = new Map();
+    const hashNodes = new Map();
+    const rootNode = new TreeNode(null);
+
+    // add root node to hash table
+    hashNodes.set(null, rootNode);
 
     for (let file of deps) {
-        let stem = getFileStem(file.path, '.deps.js');
-        let stemDependencies = parseDependencies(file.contents.toString('utf8'));
+        const stem = getFileStem(file.path, '.deps.js');
+        const stemDependencies = parseDependencies(file.contents.toString('utf8'));
 
-        if (output.has(stem)) {
-            let existingDependencies = output.get(stem);
+        // ensure that node exists in hash table
+        ensureExists(hashNodes, stem);
 
-            for (let dependency of stemDependencies) {
-                existingDependencies.add(dependency);
-            }
-        } else {
-            output.set(stem, stemDependencies);
+        // iterate through dependency (parent) nodes and add references
+        // if tree is independent, add rootNode to its dependencies
+        const treeNode = hashNodes.get(stem);
+
+        if (!stemDependencies.size) {
+            stemDependencies.add(null);
+        }
+
+        for (let dependencyStem of stemDependencies) {
+            // ensure that dependency node exists in hash table
+            ensureExists(hashNodes, dependencyStem);
+
+            const parentNode = hashNodes.get(dependencyStem);
+            treeNode.addParentNode(parentNode);
+            parentNode.addChildNode(treeNode);
         }
     }
 
-    return output;
+    return [rootNode, hashNodes];
 }
 
-function addTreeNodeDependency(tree, stem, dependency) {
-    if (!tree.has(stem)) {
-        tree.set(stem, new Set());
-    }
+function addTreeNodeDependency(hashNodes, stem, dependency) {
+    ensureExists(hashNodes, stem);
 
     if (dependency) {
-        tree.get(stem).add(dependency);
+        ensureExists(hashNodes, dependency);
+
+        const node = hashNodes.get(stem);
+        const parent = hashNodes.get(dependency);
+
+        node.addParentNode(parent);
+        parent.addChildNode(node);
     }
 }
 
-function addRecursiveNodeDependencies(tree, bemNaming) {
-    let isBlock = isBlockBemNaming(bemNaming);
-    let stem = bemNamingToClassname(bemNaming);
+function addRecursiveNodeDependencies(hashNodes, bemNaming) {
+    const isBlock = isBlockBemNaming(bemNaming);
+    const stem = bemNamingToClassname(bemNaming);
 
     if (isBlock) {
         // in case basic block is missing among deps, add it
-        addTreeNodeDependency(tree, bemNaming.block);
+        addTreeNodeDependency(hashNodes, bemNaming.block);
         return;
     }
 
@@ -218,91 +237,35 @@ function addRecursiveNodeDependencies(tree, bemNaming) {
         delete bemNaming.mod;
     }
 
-    addTreeNodeDependency(tree, stem, bemNamingToClassname(bemNaming));
-    addRecursiveNodeDependencies(tree, bemNaming);
+    addTreeNodeDependency(hashNodes, stem, bemNamingToClassname(bemNaming));
+    addRecursiveNodeDependencies(hashNodes, bemNaming);
 }
 
 /**
  * Add block/element basic dependencies to flat tree. What is basic dependency?
  * If file stem is `block__elem` then it is Set(`block`)
- * If file stem is `block_mod_val__elem` then it is Set(`block`)
+ * If file stem is `block_mod_val__elem` then it is Set(`block`, `block_mod_val`)
  *
- * @param {Map} tree
+ * @param {Map} hashNodes
+ * @param {TreeNode} rootNode
  */
-function addBasicDependencies(tree) {
-    for (let [stem,] of tree) {
-        let bemNaming = bemNamingParser(stem);
+function addBasicDependencies(hashNodes, rootNode) {
+    for (let [stem, node] of hashNodes) {
+        // skip root node
+        if (node === rootNode) {
+            continue;
+        }
+
+        const bemNaming = bemNamingParser(stem);
 
         // validate bem naming
-        let isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
-            return bemNaming[key] === '';
-        });
-
+        const isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => bemNaming[key] === '');
         if (isBadNaming) {
             throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${stem}`, {showStack: true});
         }
 
-        addRecursiveNodeDependencies(tree, bemNaming);
+        addRecursiveNodeDependencies(hashNodes, bemNaming);
     }
-}
-
-/**
- * Recursively calculate distance from node to the root element
- *
- * @param {Map} tree - flat tree of all stems
- * @param {String} stem - stem to search for
- * @param {Number} weight - current weight
- * @param {Set} dependencyTree - set of dependencies in case of circular dependency
- * @return {Number}
- */
-function calcRecursiveNodeWeight(tree, stem, weight, dependencyTree) {
-    weight += 1;
-
-    // probably this file has already been exported
-    if (!tree.has(stem)) {
-        return weight;
-    }
-
-    let dependencies = tree.get(stem);
-    if (!dependencies.size) {
-        return weight;
-    }
-
-    let weights = [];
-    for (let dependency of dependencies) {
-        if (dependencyTree.has(dependency)) {
-            throw new PluginError(PLUGIN_NAME, `Circular dependency detected: ${Array.from(dependencyTree)}`, {showStack: true});
-        }
-
-        let nodeDependencyTree = new Set(dependencyTree);
-        nodeDependencyTree.add(dependency);
-
-        let dependencyDistanceWeight = calcRecursiveNodeWeight(tree, dependency, weight, nodeDependencyTree, stem);
-        weights.push(dependencyDistanceWeight);
-    }
-
-    return Math.max(...weights);
-}
-
-/**
- * Calculation of tree nodes' weights which is the most important part of the plugin
- * By this time tree consists of all existing deps and input files with their existing dependencies
- * Each tree key is a string file stem (for example `award_important`) and value is a set of dependencies
- * Task is to calculate the longest distance to the root block out of all stem's dependencies
- * If set of stem's dependencies is empty node weight equals 1 (its parent is invisible root node)
- *
- * @param {Map} tree
- * @return {Map}
- */
-function calcTreeNodesWeight(tree) {
-    const output = new Map();
-
-    for (let [stem,] of tree) {
-        const weight = calcRecursiveNodeWeight(tree, stem, 0, new Set());
-        output.set(stem, weight);
-    }
-
-    return output;
 }
 
 /**
@@ -336,16 +299,19 @@ function gulpOrderBemDeps(deps) {
     Promise.all([
         collectStreamFiles(deps).then(combineDeps),
         inputPromise
-    ]).then(([tree, {files, ctx, closeStreamCallback}]) => {
+    ]).then(([
+        [rootNode, hashNodes],
+        {files, ctx, closeStreamCallback}
+    ]) => {
         streamCtx = ctx;
 
         // filter block files with no dependencies (2nd microtask)
         files = files.filter(file => {
-            let fileStem = getFileStem(file.path);
-            let bemNaming = bemNamingParser(fileStem);
+            const fileStem = getFileStem(file.path);
+            const bemNaming = bemNamingParser(fileStem);
 
             // validate bem naming
-            let isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
+            const isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
                 return bemNaming[key] === '';
             });
 
@@ -353,8 +319,10 @@ function gulpOrderBemDeps(deps) {
                 throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${fileStem}`, {showStack: true});
             }
 
-            let isBlock = isBlockBemNaming(bemNaming);
-            if (isBlock && !tree.has(bemNaming.block)) {
+            // if file stem is not listed in dependencies tree it's independent
+            // so it's safe to output it right now
+            const isBlock = isBlockBemNaming(bemNaming);
+            if (isBlock && !hashNodes.has(bemNaming.block)) {
                 ctx.push(file);
                 return false;
             }
@@ -363,32 +331,20 @@ function gulpOrderBemDeps(deps) {
             file[BEM_NAMING] = bemNaming;
             file[STEM] = fileStem;
 
-            if (!tree.has(fileStem)) {
-                tree.set(fileStem, new Set());
-            }
-
+            ensureExists(hashNodes, fileStem);
             return true;
         });
 
         // add missing basic dependencies
-        addBasicDependencies(tree);
+        addBasicDependencies(hashNodes, rootNode);
 
-        // calculate tree nodes' weights
-        let treeNodesWeights = calcTreeNodesWeight(tree);
-
-        // 3rd microtask: reorder
-        files.sort((a, b) => {
-            return (treeNodesWeights.get(a[STEM]) || 0) - (treeNodesWeights.get(b[STEM]) || 0);
-        });
-
-        for (let file of files) {
-            ctx.push(file);
-        }
+        // 3rd microtask: output
+        bfsOutputTree(files, rootNode, hashNodes, ctx);
 
         // close stream
         closeStreamCallback();
     }).catch(err => {
-        console.error(gutil.colors.red(err.message));
+        console.error(colors.red(err.message));
         console.error(err.toString());
 
         streamCtx.emit('error', err);
