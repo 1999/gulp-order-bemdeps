@@ -1,18 +1,19 @@
 'use strict';
 
-let vm = require('vm');
-let gutil = require('gulp-util');
-let bemNamingParser = require('parse-bem-identifier');
-let through2 = require('through2');
+import vm from 'vm';
+import bemNamingParser from 'parse-bem-identifier';
+import through2 from 'through2';
+import {colors, PluginError} from 'gulp-util';
 
-let PluginError = gutil.PluginError;
-let collectStreamFiles = require('./lib/collect-stream-files');
-let bemNamingToClassname = require('./lib/bem-naming-to-classname');
-let getFileStem = require('./lib/get-file-stem');
+import collectStreamFiles from './lib/collect-stream-files';
+import bemNamingToClassname from './lib/bem-naming-to-classname';
+import getFileStem from './lib/get-file-stem';
+import TreeNode, {ensureExists} from './lib/tree-node';
+import bfsOutputTree from './lib/bfs-output-tree';
 
 const PLUGIN_NAME = 'gulp-order-bemdeps';
 const BEM_NAMING = Symbol('bem');
-const STEM = Symbol('stem');
+const STEM = Symbol.for('stem');
 const BEM_NAMING_PARSED_KEYS = ['block', 'mod', 'modVal', 'elem', 'elemMod', 'elemVal'];
 
 /**
@@ -159,50 +160,68 @@ function parseDependencies(contents) {
 }
 
 /**
- * Combine all deps.js files into one map
- * This is useful because there can be multiple files with one stem (they are resolved with `levels` in ENB/BEM)
+ * Build tree from all deps.js files
+ * Also build hash table with all tree nodes for fast insert op
  *
- * @param {Array} deps
- * @return {Map} where keys are {String} stems and values are {Set} with dependencies of this stem
+ * @param {Array<VinylFile>} deps
+ * @return {Array<TreeNode, Map>} 2-elements array: [rootNode, hash]
  */
 function combineDeps(deps) {
-    const output = new Map();
+    const hashNodes = new Map();
+    const rootNode = new TreeNode(null);
+
+    // add root node to hash table
+    hashNodes.set(null, rootNode);
 
     for (let file of deps) {
         const stem = getFileStem(file.path, '.deps.js');
         const stemDependencies = parseDependencies(file.contents.toString('utf8'));
 
-        if (output.has(stem)) {
-            const existingDependencies = output.get(stem);
+        // ensure that node exists in hash table
+        ensureExists(hashNodes, stem);
 
-            for (let dependency of stemDependencies) {
-                existingDependencies.add(dependency);
-            }
-        } else {
-            output.set(stem, stemDependencies);
+        // iterate through dependency (parent) nodes and add references
+        // if tree is independent, add rootNode to its dependencies
+        const treeNode = hashNodes.get(stem);
+
+        if (!stemDependencies.size) {
+            stemDependencies.add(null);
+        }
+
+        for (let dependencyStem of stemDependencies) {
+            // ensure that dependency node exists in hash table
+            ensureExists(hashNodes, dependencyStem);
+
+            const parentNode = hashNodes.get(dependencyStem);
+            treeNode.addParentNode(parentNode);
+            parentNode.addChildNode(treeNode);
         }
     }
 
-    return output;
+    return [rootNode, hashNodes];
 }
 
-function addTreeNodeDependency(tree, stem, dependency) {
-    if (!tree.has(stem)) {
-        tree.set(stem, new Set());
-    }
+function addTreeNodeDependency(hashNodes, stem, dependency) {
+    ensureExists(hashNodes, stem);
 
     if (dependency) {
-        tree.get(stem).add(dependency);
+        ensureExists(hashNodes, dependency);
+
+        const node = hashNodes.get(stem);
+        const parent = hashNodes.get(dependency);
+
+        node.addParentNode(parent);
+        parent.addChildNode(node);
     }
 }
 
-function addRecursiveNodeDependencies(tree, bemNaming) {
-    let isBlock = isBlockBemNaming(bemNaming);
-    let stem = bemNamingToClassname(bemNaming);
+function addRecursiveNodeDependencies(hashNodes, bemNaming) {
+    const isBlock = isBlockBemNaming(bemNaming);
+    const stem = bemNamingToClassname(bemNaming);
 
     if (isBlock) {
         // in case basic block is missing among deps, add it
-        addTreeNodeDependency(tree, bemNaming.block);
+        addTreeNodeDependency(hashNodes, bemNaming.block);
         return;
     }
 
@@ -218,8 +237,8 @@ function addRecursiveNodeDependencies(tree, bemNaming) {
         delete bemNaming.mod;
     }
 
-    addTreeNodeDependency(tree, stem, bemNamingToClassname(bemNaming));
-    addRecursiveNodeDependencies(tree, bemNaming);
+    addTreeNodeDependency(hashNodes, stem, bemNamingToClassname(bemNaming));
+    addRecursiveNodeDependencies(hashNodes, bemNaming);
 }
 
 /**
@@ -227,119 +246,25 @@ function addRecursiveNodeDependencies(tree, bemNaming) {
  * If file stem is `block__elem` then it is Set(`block`)
  * If file stem is `block_mod_val__elem` then it is Set(`block`, `block_mod_val`)
  *
- * @param {Map} tree
+ * @param {Map} hashNodes
+ * @param {TreeNode} rootNode
  */
-function addBasicDependencies(tree) {
-    for (let [stem,] of tree) {
-        let bemNaming = bemNamingParser(stem);
+function addBasicDependencies(hashNodes, rootNode) {
+    for (let [stem, node] of hashNodes) {
+        // skip root node
+        if (node === rootNode) {
+            continue;
+        }
+
+        const bemNaming = bemNamingParser(stem);
 
         // validate bem naming
-        let isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
-            return bemNaming[key] === '';
-        });
-
+        const isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => bemNaming[key] === '');
         if (isBadNaming) {
             throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${stem}`, {showStack: true});
         }
 
-        addRecursiveNodeDependencies(tree, bemNaming);
-    }
-}
-
-/**
- * Add essential dependencies to tree. What is essential dependency?
- * If file stem is `mixins` and it depends on `variables` and there's no `variables` in tree
- * then it's `variables`
- *
- * @param {Map} tree
- */
-function addRootDependencies(tree) {
-    for (let [stem, dependencies] of tree) {
-        for (let dependencyStem of dependencies) {
-            if (!tree.has(dependencyStem)) {
-                tree.set(dependencyStem, new Set());
-            }
-        }
-    }
-}
-
-/**
- * Output tree with BFS
- *
- * @param {Array<VinylFile>} files
- * @param {Map<String:Set>} tree
- * @param {Stream} ctx
- */
-function bfsOutputTree(files, tree, ctx) {
-    // convert files into hash table so we could find faster
-    const filesHash = new Map();
-    for (let file of files) {
-        filesHash.set(file[STEM], file);
-    }
-
-    // convert dependency tree to the opposite side:
-    // right now tree node value is its dependencies i.e. stems is depends on
-    // new tree node value is its dependent i.e. stems which depend on current node
-    const treeDependents = new Map();
-    for (let [stem, dependencies] of tree) {
-        if (!treeDependents.has(stem)) {
-            treeDependents.set(stem, new Set())
-        }
-
-        for (let dependencyStem of dependencies) {
-            if (!treeDependents.has(dependencyStem)) {
-                treeDependents.set(dependencyStem, new Set());
-            }
-
-            treeDependents.get(dependencyStem).add(stem);
-        }
-    }
-
-    // find all tree nodes which have no dependencies: these are root node children
-    // then add fake root node with these nodes to start BFS
-    const rootNodeStem = Symbol('root');
-    const rootNodeChildren = new Set();
-
-    for (let [stem, dependencies] of tree) {
-        if (!dependencies.size) {
-            rootNodeChildren.add(stem);
-        }
-    }
-
-    // first add root node into processing queue
-    const processingQueue = [{
-        dependents: rootNodeChildren,
-        stem: rootNodeStem
-    }];
-
-    while (processingQueue.length) {
-        const treeNode = processingQueue.shift();
-
-        // output file corresponding to node if it's not root node
-        if (treeNode.stem !== rootNodeStem && filesHash.has(treeNode.stem)) {
-            const file = filesHash.get(treeNode.stem);
-
-            ctx.push(file);
-            filesHash.delete(treeNode.stem);
-        }
-
-        for (let stem of treeNode.dependents) {
-            // this node has probably been processed already
-            if (!treeDependents.has(stem)) {
-                continue;
-            }
-
-            const childNodeDependents = treeDependents.get(stem);
-
-            // add node to processing queue
-            processingQueue.push({
-                stem,
-                dependents: childNodeDependents
-            });
-
-            // delete it from tree so it won't be processed twice
-            treeDependents.delete(stem);
-        }
+        addRecursiveNodeDependencies(hashNodes, bemNaming);
     }
 }
 
@@ -374,7 +299,10 @@ function gulpOrderBemDeps(deps) {
     Promise.all([
         collectStreamFiles(deps).then(combineDeps),
         inputPromise
-    ]).then(([tree, {files, ctx, closeStreamCallback}]) => {
+    ]).then(([
+        [rootNode, hashNodes],
+        {files, ctx, closeStreamCallback}
+    ]) => {
         streamCtx = ctx;
 
         // filter block files with no dependencies (2nd microtask)
@@ -394,7 +322,7 @@ function gulpOrderBemDeps(deps) {
             // if file stem is not listed in dependencies tree it's independent
             // so it's safe to output it right now
             const isBlock = isBlockBemNaming(bemNaming);
-            if (isBlock && !tree.has(bemNaming.block)) {
+            if (isBlock && !hashNodes.has(bemNaming.block)) {
                 ctx.push(file);
                 return false;
             }
@@ -403,26 +331,20 @@ function gulpOrderBemDeps(deps) {
             file[BEM_NAMING] = bemNaming;
             file[STEM] = fileStem;
 
-            if (!tree.has(fileStem)) {
-                tree.set(fileStem, new Set());
-            }
-
+            ensureExists(hashNodes, fileStem);
             return true;
         });
 
         // add missing basic dependencies
-        addBasicDependencies(tree);
+        addBasicDependencies(hashNodes, rootNode);
 
-        // add essential dependencies (block->mixins->variables: add variables)
-        addRootDependencies(tree);
-
-        // 3rd microtask: reorder and output
-        bfsOutputTree(files, tree, ctx);
+        // 3rd microtask: output
+        bfsOutputTree(files, rootNode, hashNodes, ctx);
 
         // close stream
         closeStreamCallback();
     }).catch(err => {
-        console.error(gutil.colors.red(err.message));
+        console.error(colors.red(err.message));
         console.error(err.toString());
 
         streamCtx.emit('error', err);
