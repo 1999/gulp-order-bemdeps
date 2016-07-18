@@ -1,3 +1,8 @@
+## 0.8.0
+
+ * **new**: topological sorting with [topological-sort](https://www.npmjs.com/package/topological-sort). It can be significantly faster on some configurations.
+ * `eslint` is now used for linting
+
 ## 0.7.0
 
  * **new**: BFS approach to output sorted files. It can be significantly faster on some configurations.
