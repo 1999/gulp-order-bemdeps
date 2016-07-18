@@ -4,16 +4,13 @@ import vm from 'vm';
 import bemNamingParser from 'parse-bem-identifier';
 import through2 from 'through2';
 import {colors, PluginError} from 'gulp-util';
+import TopologicalSort from 'topological-sort';
 
 import collectStreamFiles from './lib/collect-stream-files';
 import bemNamingToClassname from './lib/bem-naming-to-classname';
 import getFileStem from './lib/get-file-stem';
-import TreeNode, {ensureExists} from './lib/tree-node';
-import bfsOutputTree from './lib/bfs-output-tree';
 
 const PLUGIN_NAME = 'gulp-order-bemdeps';
-const BEM_NAMING = Symbol('bem');
-const STEM = Symbol.for('stem');
 const BEM_NAMING_PARSED_KEYS = ['block', 'mod', 'modVal', 'elem', 'elemMod', 'elemVal'];
 
 /**
@@ -39,34 +36,31 @@ function isBlockBemNaming(bemNaming) {
  * @return {Object}
  */
 function getStreamAndPromiseForInputStream() {
+    const files = [];
     let resolver;
-    let files = [];
 
-    let promise = new Promise(resolve => {
+    const promise = new Promise(resolve => {
         resolver = resolve;
     });
 
-    let stream = through2.obj((file, encoding, callback) => {
+    const stream = through2.obj((file, encoding, callback) => {
         files.push(file);
         callback();
     }, function (closeStreamCallback) {
         resolver({
-            files: files,
-            ctx: this,
-            closeStreamCallback: closeStreamCallback
+            files,
+            closeStreamCallback,
+            ctx: this
         });
     });
 
-    return {
-        stream: stream,
-        promise: promise
-    };
+    return {stream, promise};
 }
 
 /**
  * Flatten dependencies from deps.js files
  *
- * @return {Array}
+ * @return {Array<String>}
  * @see https://en.bem.info/technology/deps/about/#depsjs-syntax
  */
 function flattenDepsJS(deps) {
@@ -149,10 +143,10 @@ function flattenDepsJS(deps) {
 }
 
 /**
- * Parse deps.js file contents into flat array of dependencies
+ * Parse deps.js file contents into flat set of dependencies
  *
  * @param {String} contents
- * @return {Set}
+ * @return {Set<String>}
  */
 function parseDependencies(contents) {
     let deps = vm.runInThisContext(contents);
@@ -160,69 +154,26 @@ function parseDependencies(contents) {
 }
 
 /**
- * Build tree from all deps.js files
- * Also build hash table with all tree nodes for fast insert op
+ * Build block/element basic dependencies from file name
+ * What is basic dependency?
+ * If file stem is `block__elem` then it is Set(`block`)
+ * If file stem is `block_mod_val__elem` then it is Set(`block`, `block_mod_val`)
  *
- * @param {Array<VinylFile>} deps
- * @return {Array<TreeNode, Map>} 2-elements array: [rootNode, hash]
+ * @param {String} stem
+ * @return {Array<String>}
  */
-function combineDeps(deps) {
-    const hashNodes = new Map();
-    const rootNode = new TreeNode(null);
+function buildBasicDependencies(stem) {
+    const bemNaming = bemNamingParser(stem);
+    const output = [];
 
-    // add root node to hash table
-    hashNodes.set(null, rootNode);
-
-    for (let file of deps) {
-        const stem = getFileStem(file.path, '.deps.js');
-        const stemDependencies = parseDependencies(file.contents.toString('utf8'));
-
-        // ensure that node exists in hash table
-        ensureExists(hashNodes, stem);
-
-        // iterate through dependency (parent) nodes and add references
-        // if tree is independent, add rootNode to its dependencies
-        const treeNode = hashNodes.get(stem);
-
-        if (!stemDependencies.size) {
-            stemDependencies.add(null);
-        }
-
-        for (let dependencyStem of stemDependencies) {
-            // ensure that dependency node exists in hash table
-            ensureExists(hashNodes, dependencyStem);
-
-            const parentNode = hashNodes.get(dependencyStem);
-            treeNode.addParentNode(parentNode);
-            parentNode.addChildNode(treeNode);
-        }
+    // validate bem naming
+    const isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => bemNaming[key] === '');
+    if (isBadNaming) {
+        throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${stem}`, {showStack: true});
     }
 
-    return [rootNode, hashNodes];
-}
-
-function addTreeNodeDependency(hashNodes, stem, dependency) {
-    ensureExists(hashNodes, stem);
-
-    if (dependency) {
-        ensureExists(hashNodes, dependency);
-
-        const node = hashNodes.get(stem);
-        const parent = hashNodes.get(dependency);
-
-        node.addParentNode(parent);
-        parent.addChildNode(node);
-    }
-}
-
-function addRecursiveNodeDependencies(hashNodes, bemNaming) {
-    const isBlock = isBlockBemNaming(bemNaming);
-    const stem = bemNamingToClassname(bemNaming);
-
-    if (isBlock) {
-        // in case basic block is missing among deps, add it
-        addTreeNodeDependency(hashNodes, bemNaming.block);
-        return;
+    if (isBlockBemNaming(bemNaming)) {
+        return output;
     }
 
     if (bemNaming.elemModVal) {
@@ -237,109 +188,93 @@ function addRecursiveNodeDependencies(hashNodes, bemNaming) {
         delete bemNaming.mod;
     }
 
-    addTreeNodeDependency(hashNodes, stem, bemNamingToClassname(bemNaming));
-    addRecursiveNodeDependencies(hashNodes, bemNaming);
+    const dependencyStem = bemNamingToClassname(bemNaming);
+    output.push(dependencyStem);
+
+    return output.concat(buildBasicDependencies(dependencyStem));
 }
 
 /**
- * Add block/element basic dependencies to flat tree. What is basic dependency?
- * If file stem is `block__elem` then it is Set(`block`)
- * If file stem is `block_mod_val__elem` then it is Set(`block`, `block_mod_val`)
- *
- * @param {Map} hashNodes
- * @param {TreeNode} rootNode
- */
-function addBasicDependencies(hashNodes, rootNode) {
-    for (let [stem, node] of hashNodes) {
-        // skip root node
-        if (node === rootNode) {
-            continue;
-        }
-
-        const bemNaming = bemNamingParser(stem);
-
-        // validate bem naming
-        const isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => bemNaming[key] === '');
-        if (isBadNaming) {
-            throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${stem}`, {showStack: true});
-        }
-
-        addRecursiveNodeDependencies(hashNodes, bemNaming);
-    }
-}
-
-/**
- * BEM files reorder (main exported function)
+ * BEM files reorder
  * It takes deps.js files stream as an argument and reorders input files based on built dependency tree
- * Task can be divided into three small microtasks:
- *
- * 1) Get all deps.js files and build dependency tree. There can be blocks which don't have own deps.js file
- *     which means that this block doesn't depend on anything and can be exported (sent out of pipe) right now.
- *     But also there can be input files like `award_mod_val.css` without their own deps.js files. Instead these
- *     files depend on their main block (award) which can have its own deps.js file.
- * 2) Get all input files and start iteration. If file is block (not block__elem or block_mod) and dependency tree
- *     which was built during step 1 doesn't contain it, it is independent block and can be exported right now. if this
- *     file is element declaration (`award__item.css`) or anything else which depends on smth, one should build a micro-
- *     dependency tree for this file and inject into main dependency tree.
- * 3) Re-order! One should iterate over all input files and sort them in accordance to their weight in dependency tree
+ * Uses topological sort for building dependency tree.
  *
  * @param {Stream} deps - stream of vinyl deps files (use gulp.src() for this)
  * @return {Stream}
  */
-function gulpOrderBemDeps(deps) {
+export default function gulpOrderBemDeps(deps) {
     let streamCtx;
 
-    let {
+    // wait for all input files
+    const {
         stream: output,
         promise: inputPromise
     } = getStreamAndPromiseForInputStream();
 
-    // first and second microtasks do not depend on each other so it's safe
-    // to perform them in parallel
     Promise.all([
-        collectStreamFiles(deps).then(combineDeps),
+        collectStreamFiles(deps),
         inputPromise
-    ]).then(([
-        [rootNode, hashNodes],
-        {files, ctx, closeStreamCallback}
-    ]) => {
+    ]).then(([depsFiles, {files, ctx, closeStreamCallback}]) => {
         streamCtx = ctx;
 
-        // filter block files with no dependencies (2nd microtask)
-        files = files.filter(file => {
-            const fileStem = getFileStem(file.path);
-            const bemNaming = bemNamingParser(fileStem);
+        // we need to merge files (input stream) with depsFiles (function argument stream)
+        // output should also contain basic dependencies (`block` for `block__elem`)
+        // we also need to distinguish between existing files in the merged set
+        // and those which don't exist (there's no such file in `files` array)
+        const mergedNodes = new Map;
+        const edges = [];
 
-            // validate bem naming
-            const isBadNaming = BEM_NAMING_PARSED_KEYS.some(key => {
-                return bemNaming[key] === '';
-            });
+        // first add all dependencies with their dependencies
+        for (let dependencyFile of depsFiles) {
+            const stem = getFileStem(dependencyFile.path, '.deps.js');
+            const stemDependencies = parseDependencies(dependencyFile.contents.toString('utf8'));
 
-            if (isBadNaming) {
-                throw new PluginError(PLUGIN_NAME, `Invalid bem naming used: ${fileStem}`, {showStack: true});
+            if (!mergedNodes.has(stem)) {
+                mergedNodes.set(stem, {});
             }
 
-            // if file stem is not listed in dependencies tree it's independent
-            // so it's safe to output it right now
-            const isBlock = isBlockBemNaming(bemNaming);
-            if (isBlock && !hashNodes.has(bemNaming.block)) {
-                ctx.push(file);
-                return false;
+            for (let dependencyStem of stemDependencies) {
+                if (!mergedNodes.has(dependencyStem)) {
+                    mergedNodes.set(dependencyStem, {});
+                }
+
+                edges.push([dependencyStem, stem]);
             }
+        }
 
-            // build microdeps tree and inject it into the main one
-            file[BEM_NAMING] = bemNaming;
-            file[STEM] = fileStem;
+        // then add all files and their basic dependencies
+        for (let inputFile of files) {
+            const stem = getFileStem(inputFile.path);
+            const mergedNode = mergedNodes.get(stem) || {};
+            mergedNode.file = inputFile;
+            mergedNodes.set(stem, mergedNode);
 
-            ensureExists(hashNodes, fileStem);
-            return true;
-        });
+            const fileDependencies = buildBasicDependencies(stem);
 
-        // add missing basic dependencies
-        addBasicDependencies(hashNodes, rootNode);
+            for (let i = 0; i < fileDependencies.length; i++) {
+                const dependencyFileStem = fileDependencies[i];
 
-        // 3rd microtask: output
-        bfsOutputTree(files, rootNode, hashNodes, ctx);
+                if (!mergedNodes.has(dependencyFileStem)) {
+                    mergedNodes.set(dependencyFileStem, {});
+                }
+
+                const toEdgeKey = (i === 0) ? stem : fileDependencies[i - 1];
+                edges.push([fileDependencies[i], toEdgeKey]);
+            }
+        }
+
+        const sortOp = new TopologicalSort(mergedNodes);
+        for (let [fromKey, toKey] of edges) {
+            sortOp.addEdge(fromKey, toKey);
+        }
+
+        const sorted = sortOp.sort();
+
+        for (let [, value] of sorted) {
+            if (value.file) {
+                ctx.push(value.file);
+            }
+        }
 
         // close stream
         closeStreamCallback();
@@ -352,5 +287,3 @@ function gulpOrderBemDeps(deps) {
 
     return output;
 }
-
-module.exports = gulpOrderBemDeps;
