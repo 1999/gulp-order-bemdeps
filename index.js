@@ -279,8 +279,10 @@ export default function gulpOrderBemDeps(deps) {
         // close stream
         closeStreamCallback();
     }).catch(err => {
+        /* eslint-disable no-console */
         console.error(colors.red(err.message));
         console.error(err.toString());
+        /* eslint-enable no-console */
 
         streamCtx.emit('error', err);
     });
