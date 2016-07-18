@@ -197,7 +197,7 @@ describe('gulp-order-bemdeps', () => {
         fillInputFiles(['some-block'], myBemDepsOrder);
 
         return collectStreamFiles(myBemDepsOrder).catch(err => {
-            expect(err.message).to.match(new RegExp('^Circular dependency detected'));
+            expect(err.message).to.contain('circular dependency');
         });
     });
 
@@ -273,14 +273,17 @@ describe('gulp-order-bemdeps', () => {
     it('should reorder files if deps.js filles contain elemMods', () => {
         let stream = noop();
         let myBemDepsOrder = bemDepsOrder(stream);
+        const blocks = ['film-header__argument', 'film-header', 'button__elem_size_s', 'input__elem_size'];
 
         // fill dependencies
         fillDeps('deps-elemMods', stream);
 
         // now pipe input files
-        fillInputFiles(['film-header__argument', 'film-header', 'button__elem_size_s', 'input__elem_size'], myBemDepsOrder);
+        fillInputFiles(blocks, myBemDepsOrder);
 
         return collectStreamFiles(myBemDepsOrder).then(files => {
+            expect(files).to.have.length(blocks.length);
+
             expect(getFileStem(files[0].path)).to.equal('input__elem_size');
             expect(getFileStem(files[1].path)).to.equal('button__elem_size_s');
             expect(getFileStem(files[2].path)).to.equal('film-header');
