@@ -1,5 +1,7 @@
 # gulp-order-bemdeps
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/1999/gulp-order-bemdeps.svg)](https://greenkeeper.io/)
+
 [![Build Status](https://img.shields.io/travis/1999/gulp-order-bemdeps.svg?style=flat)](https://travis-ci.org/1999/gulp-order-bemdeps)
 [![Dependency Status](http://img.shields.io/david/1999/gulp-order-bemdeps.svg?style=flat)](https://david-dm.org/1999/gulp-order-bemdeps#info=dependencies)
 [![DevDependency Status](http://img.shields.io/david/dev/1999/gulp-order-bemdeps.svg?style=flat)](https://david-dm.org/1999/gulp-order-bemdeps#info=devDependencies)
