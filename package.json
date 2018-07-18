@@ -5,13 +5,13 @@
   "bugs": {
     "url": "https://github.com/1999/gulp-order-bemdeps/issues"
   },
-  "maintainers": "Dmitry Sorin <dsorin@yandex-team.ru>",
-  "repository": [
-    {
-      "type": "git",
-      "url": "git://github.com/1999/gulp-order-bemdeps.git"
-    }
+  "maintainers": [
+    "Dmitrii Sorin <dsorin@yandex-team.ru>"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/1999/gulp-order-bemdeps.git"
+  },
   "keywords": [
     "bem",
     "dependency management",
