@@ -1,3 +1,7 @@
+## 0.8.1
+
+ * bump `topological-sort` package, get rid of deprecated `gulp-util`
+
 ## 0.8.0
 
  * **new**: topological sorting with [topological-sort](https://www.npmjs.com/package/topological-sort). It can be significantly faster on some configurations.
