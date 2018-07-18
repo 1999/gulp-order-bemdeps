@@ -5,13 +5,13 @@
   "bugs": {
     "url": "https://github.com/1999/gulp-order-bemdeps/issues"
   },
-  "maintainers": "Dmitry Sorin <dsorin@yandex-team.ru>",
-  "repository": [
-    {
-      "type": "git",
-      "url": "git://github.com/1999/gulp-order-bemdeps.git"
-    }
+  "maintainers": [
+    "Dmitrii Sorin <dsorin@yandex-team.ru>"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/1999/gulp-order-bemdeps.git"
+  },
   "keywords": [
     "bem",
     "dependency management",
@@ -23,11 +23,11 @@
     "gulp-util": "3.0.8",
     "parse-bem-identifier": "4.0.0",
     "through2": "2.0.3",
-    "topological-sort": "0.1.5"
+    "topological-sort": "0.2.0"
   },
   "license": "MIT",
   "engines": {
-    "node": ">=6.0"
+    "node": ">=8"
   },
   "devDependencies": {
     "babel-cli": "^6.6.5",
