@@ -20,10 +20,10 @@
   ],
   "main": "./dist/build.js",
   "dependencies": {
-    "gulp-util": "3.0.8",
-    "parse-bem-identifier": "4.0.0",
-    "through2": "2.0.3",
-    "topological-sort": "0.2.0"
+    "ansi-colors": "^2.0.3",
+    "parse-bem-identifier": "^4.0.0",
+    "plugin-error": "^1.0.1",
+    "topological-sort": "^0.2.0"
   },
   "license": "MIT",
   "engines": {
@@ -38,7 +38,9 @@
     "babel-register": "^6.7.2",
     "chai": "^4.1.1",
     "eslint": "^5.0.0",
-    "mocha": "^5.0.0"
+    "mocha": "^5.0.0",
+    "through2": "^2.0.3",
+    "vinyl": "^2.2.0"
   },
   "scripts": {
     "lint": "./node_modules/.bin/eslint index.js lib/ test/",

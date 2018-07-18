@@ -1,9 +1,10 @@
 'use strict';
 
 import vm from 'vm';
+import colors from 'ansi-colors';
+import PluginError from 'plugin-error';
 import bemNamingParser from 'parse-bem-identifier';
 import through2 from 'through2';
-import {colors, PluginError} from 'gulp-util';
 import { TopologicalSort } from 'topological-sort';
 
 import collectStreamFiles from './lib/collect-stream-files';

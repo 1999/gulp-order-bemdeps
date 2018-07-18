@@ -1,8 +1,9 @@
 'use strict';
 
 import path from 'path';
-import {noop, File} from 'gulp-util';
 import {expect} from 'chai';
+import { obj as noop } from 'through2';
+import File from 'vinyl';
 
 import bemDepsOrder from '../index.js';
 import collectStreamFiles from '../lib/collect-stream-files';
