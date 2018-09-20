@@ -20,7 +20,7 @@
   ],
   "main": "./dist/build.js",
   "dependencies": {
-    "ansi-colors": "^3.0.0",
+    "ansi-colors": "^3.0.6",
     "parse-bem-identifier": "^4.0.0",
     "plugin-error": "^1.0.1",
     "topological-sort": "^0.2.0"
