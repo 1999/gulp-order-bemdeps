@@ -37,7 +37,7 @@
     "babel-plugin-transform-es2015-spread": "^6.6.5",
     "babel-register": "^6.7.2",
     "chai": "^4.1.1",
-    "eslint": "^5.0.0",
+    "eslint": "^5.15.1",
     "mocha": "^5.0.0",
     "through2": "^3.0.0",
     "vinyl": "^2.2.0"
